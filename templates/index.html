@@ -1,0 +1,282 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spelling Practice</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header-container">
+        <h1>Spelling Practice</h1>
+
+        <div class="auth-nav">
+          {% if logged_in %}
+          <span class="welcome-message">Welcome, {{ username }}!</span>
+          <a href="{{ url_for('logout') }}" class="auth-link">Logout</a>
+          {% else %}
+          <a href="{{ url_for('login') }}" class="auth-link">Login</a>
+          <a href="{{ url_for('register') }}" class="auth-link">Register</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Enter Your Words</h2>
+        <p>Add the words you want to practice, one per line:</p>
+        <textarea
+          id="word-list"
+          rows="10"
+          placeholder="Enter words here, one per line
+example
+difficult
+literature
+vocabulary"
+        ></textarea>
+
+        <div class="form-group">
+          <h3>Select Practice Type</h3>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="practice-type" value="spell" checked />
+              Spelling Practice
+            </label>
+            <label>
+              <input type="radio" name="practice-type" value="fill_blank" />
+              Fill in the Blanks
+            </label>
+            <label>
+              <input type="radio" name="practice-type" value="scramble" />
+              Word Scramble
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="practice-type"
+                value="multiple_choice"
+              />
+              Multiple Choice
+            </label>
+            <label>
+              <input type="radio" name="practice-type" value="word_building" />
+              Word Building
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="practice-type"
+                value="error_correction"
+              />
+              Error Correction
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input
+              type="checkbox"
+              id="save-list-check"
+              {%
+              if
+              not
+              logged_in
+              %}disabled{%
+              endif
+              %}
+            />
+            Save this word list for later use {% if not logged_in %}
+            <span class="login-required">(login required)</span>
+            {% endif %}
+          </label>
+          <div id="list-name-container" class="hidden">
+            <input
+              type="text"
+              id="list-name"
+              placeholder="Enter a name for this list"
+            />
+          </div>
+        </div>
+
+        <button id="submit-btn">Create Practice Session</button>
+        <div id="loading" class="hidden">
+          Preparing your practice session...
+        </div>
+      </div>
+
+      {% if logged_in %}
+      <div
+        class="card"
+        id="saved-lists-container"
+        {%
+        if
+        not
+        word_lists
+        %}style="display:none"
+        {%
+        endif
+        %}
+      >
+        <h2>Your Saved Word Lists</h2>
+        <div id="saved-lists">
+          {% if word_lists %} {% for list_name in word_lists %}
+          <div class="saved-list-item">
+            <span>{{ list_name }}</span>
+            <div class="list-actions">
+              <button class="use-list-btn" data-list="{{ list_name }}">
+                Use
+              </button>
+              <button class="delete-list-btn" data-list="{{ list_name }}">
+                Delete
+              </button>
+            </div>
+          </div>
+          {% endfor %} {% else %}
+          <p>No saved lists yet.</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %} {% if get_flashed_messages() %}
+      <div class="card">
+        <div class="flash-messages">
+          {% for category, message in get_flashed_messages(with_categories=true)
+          %}
+          <div class="flash-message {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <script>
+      // Toggle list name input visibility based on checkbox
+      document
+        .getElementById("save-list-check")
+        .addEventListener("change", function () {
+          document
+            .getElementById("list-name-container")
+            .classList.toggle("hidden", !this.checked);
+        });
+
+      // Submit new practice session
+      document
+        .getElementById("submit-btn")
+        .addEventListener("click", async () => {
+          const wordList = document.getElementById("word-list").value;
+          if (!wordList.trim()) {
+            alert("Please enter at least one word");
+            return;
+          }
+
+          const saveList = document.getElementById("save-list-check").checked;
+          const listName = document.getElementById("list-name").value.trim();
+
+          if (saveList && !listName) {
+            alert("Please enter a name for your word list");
+            return;
+          }
+
+          // Get selected practice type
+          const practiceType = document.querySelector(
+            'input[name="practice-type"]:checked'
+          ).value;
+
+          // Show loading indicator
+          document.getElementById("loading").classList.remove("hidden");
+          document.getElementById("submit-btn").disabled = true;
+
+          try {
+            const response = await fetch("/submit_words", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                words: wordList,
+                save_list: saveList,
+                list_name: listName,
+                practice_type: practiceType,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Something went wrong");
+            }
+
+            const data = await response.json();
+            window.location.href = `/practice/${data.session_id}`;
+          } catch (error) {
+            console.error("Error:", error);
+            alert(error.message || "Something went wrong. Please try again.");
+            document.getElementById("loading").classList.add("hidden");
+            document.getElementById("submit-btn").disabled = false;
+          }
+        });
+
+      // Use saved list
+      document.querySelectorAll(".use-list-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const listName = button.getAttribute("data-list");
+          try {
+            const response = await fetch(`/get_saved_list/${listName}`);
+
+            if (!response.ok) {
+              throw new Error("Failed to load word list");
+            }
+
+            const data = await response.json();
+
+            if (data.words) {
+              document.getElementById("word-list").value =
+                data.words.join("\n");
+            }
+          } catch (error) {
+            console.error("Error loading word list:", error);
+            alert("Error loading word list. Please try again.");
+          }
+        });
+      });
+
+      // Delete saved list
+      document.querySelectorAll(".delete-list-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const listName = button.getAttribute("data-list");
+          if (
+            confirm(`Are you sure you want to delete the list "${listName}"?`)
+          ) {
+            try {
+              const response = await fetch(`/delete_word_list/${listName}`, {
+                method: "POST",
+              });
+
+              if (response.ok) {
+                // Remove the list item from the DOM
+                button.closest(".saved-list-item").remove();
+
+                // Check if there are any lists left
+                if (
+                  document.querySelectorAll(".saved-list-item").length === 0
+                ) {
+                  document.getElementById(
+                    "saved-lists-container"
+                  ).style.display = "none";
+                }
+              } else {
+                alert("Error deleting word list. Please try again.");
+              }
+            } catch (error) {
+              console.error("Error deleting word list:", error);
+              alert("Error deleting word list. Please try again.");
+            }
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

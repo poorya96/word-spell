@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spelling Practice</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Spelling Practice</h1>
+      <div class="card" id="practice-area">
+        <div id="progress">
+          Word <span id="current-word-num">1</span> of
+          <span id="total-words">?</span>
+        </div>
+
+        <!-- Spelling practice UI -->
+        <div
+          id="spelling-practice"
+          class="practice-ui"
+          {%
+          if
+          practice_type
+          !="spell"
+          %}style="display: none;"
+          {%
+          endif
+          %}
+        >
+          <button id="play-btn">🔊 Play Word</button>
+          <input
+            type="text"
+            id="word-input"
+            placeholder="Type the word you hear..."
+            autocomplete="off"
+          />
+          <button id="check-btn">Check</button>
+
+          <div id="spell-result" class="result hidden"></div>
+          <button id="spell-next-btn" class="next-btn hidden">Next Word</button>
+        </div>
+
+        <!-- Fill in the blanks UI -->
+        <div
+          id="fill-blank-practice"
+          class="practice-ui"
+          {%
+          if
+          practice_type
+          !="fill_blank"
+          %}style="display: none;"
+          {%
+          endif
+          %}
+        >
+          <h3>Fill in the blanks:</h3>
+          <div id="blanked-word" class="blanked-word"></div>
+          <input
+            type="text"
+            id="blank-input"
+            placeholder="Type the complete word..."
+            autocomplete="off"
+          />
+          <button id="blank-check-btn">Check</button>
+
+          <div id="blank-result" class="result hidden"></div>
+          <button id="blank-play-btn" class="hidden">🔊 Listen to Word</button>
+          <button id="blank-next-btn" class="next-btn hidden">Next Word</button>
+        </div>
+
+        <!-- Word Scramble UI -->
+        <div
+          id="scramble-practice"
+          class="practice-ui"
+          {%
+          if
+          practice_type
+          !="scramble"
+          %}style="display: none;"
+          {%
+          endif
+          %}
+        >
+          <h3>Unscramble the letters:</h3>
+          <div id="scrambled-word" class="scrambled-word"></div>
+          <input
+            type="text"
+            id="scramble-input"
+            placeholder="Type the correct word..."
+            autocomplete="off"
+          />
+          <button id="scramble-check-btn">Check</button>
+
+          <div id="scramble-result" class="result hidden"></div>
+          <button id="scramble-play-btn" class="hidden">
+            🔊 Listen to Word
+          </button>
+          <button id="scramble-next-btn" class="next-btn hidden">
+            Next Word
+          </button>
+        </div>
+
+        <!-- Multiple Choice UI -->
+        <div
+          id="multiple-choice-practice"
+          class="practice-ui"
+          {%
+          if
+          practice_type
+          !="multiple_choice"
+          %}style="display: none;"
+          {%
+          endif
+          %}
+        >
+          <h3>Select the correct spelling:</h3>
+          <button id="mc-play-btn">🔊 Play Word</button>
+          <div id="mc-options" class="mc-options"></div>
+
+          <div id="mc-result" class="result hidden"></div>
+          <button id="mc-next-btn" class="next-btn hidden">Next Word</button>
+        </div>
+
+        <!-- Word Building UI -->
+        <div
+          id="word-building-practice"
+          class="practice-ui"
+          {%
+          if
+          practice_type
+          !="word_building"
+          %}style="display: none;"
+          {%
+          endif
+          %}
+        >
+          <h3>Complete the word by adding one letter at a time:</h3>
+          <div id="word-building-display">
+            <div id="wb-current-display" class="wb-display"></div>
+            <div id="wb-target-display" class="wb-display hidden"></div>
+          </div>
+          <button id="wb-play-btn">🔊 Listen to Complete Word</button>
+          <div id="wb-input-container">
+            <input
+              type="text"
+              id="wb-input"
+              placeholder="Add the next letter..."
+              maxlength="1"
+              autocomplete="off"
+            />
+            <button id="wb-check-btn">Add</button>
+          </div>
+
+          <div id="wb-result" class="result hidden"></div>
+          <button id="wb-next-btn" class="next-btn hidden">Next Word</button>
+        </div>
+
+        <!-- Error Correction UI -->
+        <div
+          id="error-correction-practice"
+          class="practice-ui"
+          {%
+          if
+          practice_type
+          !="error_correction"
+          %}style="display: none;"
+          {%
+          endif
+          %}
+        >
+          <h3>Correct the spelling error:</h3>
+          <div id="incorrect-word" class="incorrect-word"></div>
+          <input
+            type="text"
+            id="error-correction-input"
+            placeholder="Type the corrected word..."
+            autocomplete="off"
+          />
+          <button id="error-correction-check-btn">Check</button>
+
+          <div id="error-correction-result" class="result hidden"></div>
+          <button id="error-correction-play-btn" class="hidden">
+            🔊 Listen to Correct Word
+          </button>
+          <button id="error-correction-next-btn" class="next-btn hidden">
+            Next Word
+          </button>
+        </div>
+
+        <div id="final-results" class="hidden">
+          <h2>Practice Complete!</h2>
+          <p>Your score: <span id="score">0</span>/<span id="total">0</span></p>
+          <div id="mistakes-container" class="hidden">
+            <h3>Words to review:</h3>
+            <ul id="mistakes-list"></ul>
+          </div>
+          <div class="final-buttons">
+            <button id="retry-btn">Retry with Same Words</button>
+            <button id="home-btn">Back to Home</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Session data
+      const sessionId = "{{ session_id }}";
+      const practiceType = "{{ practice_type }}";
+      let words = [];
+      let currentWordIndex = 0;
+      let correctCount = 0;
+      let mistakes = [];
+
+      // Extra data for specific practice types
+      let blankedWords = [];
+      let solutions = [];
+      let scrambledWords = [];
+      let optionsList = [];
+      let incorrectWords = [];
+      let wordBuildingState = {
+        targetWord: "",
+        currentProgress: "",
+        nextLetterIndex: 0,
+      };
+
+      // DOM elements - Common
+      const totalWordsEl = document.getElementById("total-words");
+      const currentWordNumEl = document.getElementById("current-word-num");
+      const finalResultsEl = document.getElementById("final-results");
+      const scoreEl = document.getElementById("score");
+      const totalEl = document.getElementById("total");
+      const mistakesContainerEl = document.getElementById("mistakes-container");
+      const mistakesListEl = document.getElementById("mistakes-list");
+
+      // DOM elements - Spelling Practice
+      const spellingPracticeEl = document.getElementById("spelling-practice");
+      const playBtn = document.getElementById("play-btn");
+      const wordInput = document.getElementById("word-input");
+      const checkBtn = document.getElementById("check-btn");
+      const spellResultEl = document.getElementById("spell-result");
+      const spellNextBtn = document.getElementById("spell-next-btn");
+
+      // DOM elements - Fill in Blanks
+      const fillBlankPracticeEl = document.getElementById(
+        "fill-blank-practice"
+      );
+      const blankedWordEl = document.getElementById("blanked-word");
+      const blankInput = document.getElementById("blank-input");
+      const blankCheckBtn = document.getElementById("blank-check-btn");
+      const blankResultEl = document.getElementById("blank-result");
+      const blankPlayBtn = document.getElementById("blank-play-btn");
+      const blankNextBtn = document.getElementById("blank-next-btn");
+
+      // DOM elements - Word Scramble
+      const scramblePracticeEl = document.getElementById("scramble-practice");
+      const scrambledWordEl = document.getElementById("scrambled-word");
+      const scrambleInput = document.getElementById("scramble-input");
+      const scrambleCheckBtn = document.getElementById("scramble-check-btn");
+      const scrambleResultEl = document.getElementById("scramble-result");
+      const scramblePlayBtn = document.getElementById("scramble-play-btn");
+      const scrambleNextBtn = document.getElementById("scramble-next-btn");
+
+      // DOM elements - Multiple Choice
+      const multipleChoicePracticeEl = document.getElementById(
+        "multiple-choice-practice"
+      );
+      const mcPlayBtn = document.getElementById("mc-play-btn");
+      const mcOptionsEl = document.getElementById("mc-options");
+      const mcResultEl = document.getElementById("mc-result");
+      const mcNextBtn = document.getElementById("mc-next-btn");
+
+      // DOM elements - Word Building
+      const wordBuildingPracticeEl = document.getElementById(
+        "word-building-practice"
+      );
+      const wbCurrentDisplayEl = document.getElementById("wb-current-display");
+      const wbTargetDisplayEl = document.getElementById("wb-target-display");
+      const wbPlayBtn = document.getElementById("wb-play-btn");
+      const wbInput = document.getElementById("wb-input");
+      const wbCheckBtn = document.getElementById("wb-check-btn");
+      const wbResultEl = document.getElementById("wb-result");
+      const wbNextBtn = document.getElementById("wb-next-btn");
+
+      // DOM elements - Error Correction
+      const errorCorrectionPracticeEl = document.getElementById(
+        "error-correction-practice"
+      );
+      const incorrectWordEl = document.getElementById("incorrect-word");
+      const errorCorrectionInput = document.getElementById(
+        "error-correction-input"
+      );
+      const errorCorrectionCheckBtn = document.getElementById(
+        "error-correction-check-btn"
+      );
+      const errorCorrectionResultEl = document.getElementById(
+        "error-correction-result"
+      );
+      const errorCorrectionPlayBtn = document.getElementById(
+        "error-correction-play-btn"
+      );
+      const errorCorrectionNextBtn = document.getElementById(
+        "error-correction-next-btn"
+      );
+
+      // Final buttons
+      const retryBtn = document.getElementById("retry-btn");
+      const homeBtn = document.getElementById("home-btn");
+
+      // Audio player
+      let audio = new Audio();
+
+      // Fetch words
+      async function loadWords() {
+        try {
+          const response = await fetch(`/get_words/${sessionId}`);
+          const data = await response.json();
+
+          words = data.words;
+          totalWordsEl.textContent = words.length;
+          totalEl.textContent = words.length;
+
+          // Load practice-specific data
+          if (practiceType === "fill_blank") {
+            blankedWords = data.blanked_words;
+            solutions = data.solutions;
+            updateBlankedWord();
+          } else if (practiceType === "scramble") {
+            scrambledWords = data.scrambled_words;
+            updateScrambledWord();
+          } else if (practiceType === "multiple_choice") {
+            optionsList = data.options_list;
+            updateMultipleChoiceOptions();
+          } else if (practiceType === "word_building") {
+            initWordBuilding();
+          } else if (practiceType === "error_correction") {
+            incorrectWords = data.incorrect_words;
+            updateIncorrectWord();
+          }
+        } catch (error) {
+          console.error("Error loading words:", error);
+          alert("Error loading practice words. Please try again.");
+        }
+      }
+
+      // Play current word
+      function playCurrentWord() {
+        const word = words[currentWordIndex];
+        audio.src = `/static/audio/${word}.mp3`;
+        audio.play();
+      }
+
+      // Update blanked word display
+      function updateBlankedWord() {
+        if (practiceType === "fill_blank") {
+          // Create span elements for each character
+          const wordDisplay = blankedWords[currentWordIndex]
+            .split("")
+            .map((char) => {
+              if (char === "_") {
+                return '<span class="blank">_</span>';
+              } else {
+                return `<span>${char}</span>`;
+              }
+            })
+            .join("");
+
+          blankedWordEl.innerHTML = wordDisplay;
+        }
+      }
+
+      // Update scrambled word display
+      function updateScrambledWord() {
+        if (practiceType === "scramble") {
+          scrambledWordEl.textContent = scrambledWords[currentWordIndex];
+        }
+      }
+
+      // Update multiple choice options
+      function updateMultipleChoiceOptions() {
+        if (practiceType === "multiple_choice") {
+          mcOptionsEl.innerHTML = "";
+          const options = optionsList[currentWordIndex];
+
+          options.forEach((option, index) => {
+            const btn = document.createElement("button");
+            btn.classList.add("mc-option");
+            btn.textContent = option;
+            btn.addEventListener("click", () =>
+              checkMultipleChoiceAnswer(option)
+            );
+            mcOptionsEl.appendChild(btn);
+          });
+        }
+      }
+
+      // Initialize word building
+      function initWordBuilding() {
+        if (practiceType === "word_building") {
+          wordBuildingState.targetWord = words[currentWordIndex];
+          wordBuildingState.currentProgress = "";
+          wordBuildingState.nextLetterIndex = 0;
+          updateWordBuildingDisplay();
+        }
+      }
+
+      // Update word building display
+      function updateWordBuildingDisplay() {
+        wbCurrentDisplayEl.textContent = wordBuildingState.currentProgress;
+
+        // If the word is complete, show the target word
+        if (
+          wordBuildingState.currentProgress.length ===
+          wordBuildingState.targetWord.length
+        ) {
+          wbTargetDisplayEl.textContent = wordBuildingState.targetWord;
+          wbTargetDisplayEl.classList.remove("hidden");
+        } else {
+          wbTargetDisplayEl.classList.add("hidden");
+        }
+      }
+
+      // Update incorrect word display
+      function updateIncorrectWord() {
+        if (practiceType === "error_correction") {
+          incorrectWordEl.textContent = incorrectWords[currentWordIndex];
+        }
+      }
+
+      // Check spelling answer
+      function checkSpellingAnswer() {
+        const userInput = wordInput.value.trim().toLowerCase();
+        const correctWord = words[currentWordIndex].toLowerCase();
+
+        if (userInput === correctWord) {
+          spellResultEl.innerHTML = `<span class="correct">Correct!</span>`;
+          correctCount++;
+        } else {
+          spellResultEl.innerHTML = `<span class="incorrect">Incorrect. The correct spelling is: <b>${correctWord}</b></span>`;
+          mistakes.push(correctWord);
+        }
+
+        spellResultEl.classList.remove("hidden");
+        spellNextBtn.classList.remove("hidden");
+        checkBtn.disabled = true;
+        wordInput.disabled = true;
+      }
+
+      // Check fill in the blanks answer
+      function checkBlankAnswer() {
+        const userInput = blankInput.value.trim().toLowerCase();
+        const correctWord = solutions[currentWordIndex].toLowerCase();
+
+        if (userInput === correctWord) {
+          blankResultEl.innerHTML = `<span class="correct">Correct!</span>`;
+          correctCount++;
+        } else {
+          blankResultEl.innerHTML = `<span class="incorrect">Incorrect. The correct spelling is: <b>${correctWord}</b></span>`;
+          mistakes.push(correctWord);
+        }
+
+        blankResultEl.classList.remove("hidden");
+        blankPlayBtn.classList.remove("hidden");
+        blankNextBtn.classList.remove("hidden");
+        blankCheckBtn.disabled = true;
+        blankInput.disabled = true;
+      }
+
+      // Check word scramble answer
+      function checkScrambleAnswer() {
+        const userInput = scrambleInput.value.trim().toLowerCase();
+        const correctWord = words[currentWordIndex].toLowerCase();
+
+        if (userInput === correctWord) {
+          scrambleResultEl.innerHTML = `<span class="correct">Correct!</span>`;
+          correctCount++;
+        } else {
+          scrambleResultEl.innerHTML = `<span class="incorrect">Incorrect. The correct spelling is: <b>${correctWord}</b></span>`;
+          mistakes.push(correctWord);
+        }
+
+        scrambleResultEl.classList.remove("hidden");
+        scramblePlayBtn.classList.remove("hidden");
+        scrambleNextBtn.classList.remove("hidden");
+        scrambleCheckBtn.disabled = true;
+        scrambleInput.disabled = true;
+      }
+
+      // Check multiple choice answer
+      function checkMultipleChoiceAnswer(selectedOption) {
+        const correctWord = words[currentWordIndex];
+
+        // Disable all option buttons
+        const optionButtons = mcOptionsEl.querySelectorAll(".mc-option");
+        optionButtons.forEach((btn) => {
+          btn.disabled = true;
+
+          // Highlight the correct answer and the user's selection
+          if (btn.textContent === correctWord) {
+            btn.classList.add("correct-option");
+          } else if (
+            btn.textContent === selectedOption &&
+            selectedOption !== correctWord
+          ) {
+            btn.classList.add("incorrect-option");
+          }
+        });
+
+        if (selectedOption === correctWord) {
+          mcResultEl.innerHTML = `<span class="correct">Correct!</span>`;
+          correctCount++;
+        } else {
+          mcResultEl.innerHTML = `<span class="incorrect">Incorrect. The correct spelling is: <b>${correctWord}</b></span>`;
+          mistakes.push(correctWord);
+        }
+
+        mcResultEl.classList.remove("hidden");
+        mcNextBtn.classList.remove("hidden");
+      }
+
+      // Check word building answer
+      function checkWordBuildingAnswer() {
+        const letterInput = wbInput.value.trim().toLowerCase();
+
+        if (letterInput.length !== 1) {
+          alert("Please enter exactly one letter.");
+          return;
+        }
+
+        const targetWord = wordBuildingState.targetWord.toLowerCase();
+        const nextCorrectLetter =
+          targetWord[wordBuildingState.nextLetterIndex].toLowerCase();
+
+        if (letterInput === nextCorrectLetter) {
+          // Add the letter to current progress
+          wordBuildingState.currentProgress += nextCorrectLetter;
+          wordBuildingState.nextLetterIndex++;
+          updateWordBuildingDisplay();
+
+          // Clear input for next letter
+          wbInput.value = "";
+
+          // If the word is complete
+          if (wordBuildingState.currentProgress.length === targetWord.length) {
+            wbResultEl.innerHTML = `<span class="correct">Excellent! You've built the word correctly.</span>`;
+            wbResultEl.classList.remove("hidden");
+            wbNextBtn.classList.remove("hidden");
+            wbInput.disabled = true;
+            wbCheckBtn.disabled = true;
+            correctCount++;
+          }
+        } else {
+          wbResultEl.innerHTML = `<span class="incorrect">Incorrect letter. The next letter should be: <b>${nextCorrectLetter}</b></span>`;
+          wbResultEl.classList.remove("hidden");
+
+          // If they get it wrong, show the target word and move to next
+          wbTargetDisplayEl.textContent = targetWord;
+          wbTargetDisplayEl.classList.remove("hidden");
+          wbNextBtn.classList.remove("hidden");
+          wbInput.disabled = true;
+          wbCheckBtn.disabled = true;
+          mistakes.push(targetWord);
+        }
+      }
+
+      // Check error correction answer
+      function checkErrorCorrectionAnswer() {
+        const userInput = errorCorrectionInput.value.trim().toLowerCase();
+        const correctWord = words[currentWordIndex].toLowerCase();
+
+        if (userInput === correctWord) {
+          errorCorrectionResultEl.innerHTML = `<span class="correct">Correct!</span>`;
+          correctCount++;
+        } else {
+          errorCorrectionResultEl.innerHTML = `<span class="incorrect">Incorrect. The correct spelling is: <b>${correctWord}</b></span>`;
+          mistakes.push(correctWord);
+        }
+
+        errorCorrectionResultEl.classList.remove("hidden");
+        errorCorrectionPlayBtn.classList.remove("hidden");
+        errorCorrectionNextBtn.classList.remove("hidden");
+        errorCorrectionCheckBtn.disabled = true;
+        errorCorrectionInput.disabled = true;
+      }
+
+      // Move to next word
+      function nextWord() {
+        if (currentWordIndex + 1 >= words.length) {
+          showFinalResults();
+          return;
+        }
+
+        // Then actually move to the next word
+        currentWordIndex++;
+        currentWordNumEl.textContent = currentWordIndex + 1;
+
+        // Clear previous results
+        if (practiceType === "spell") {
+          spellResultEl.classList.add("hidden");
+          spellNextBtn.classList.add("hidden");
+          wordInput.value = "";
+          wordInput.disabled = false;
+          checkBtn.disabled = false;
+        } else if (practiceType === "fill_blank") {
+          blankResultEl.classList.add("hidden");
+          blankPlayBtn.classList.add("hidden");
+          blankNextBtn.classList.add("hidden");
+          blankInput.value = "";
+          blankInput.disabled = false;
+          blankCheckBtn.disabled = false;
+          updateBlankedWord();
+        } else if (practiceType === "scramble") {
+          scrambleResultEl.classList.add("hidden");
+          scramblePlayBtn.classList.add("hidden");
+          scrambleNextBtn.classList.add("hidden");
+          scrambleInput.value = "";
+          scrambleInput.disabled = false;
+          scrambleCheckBtn.disabled = false;
+          updateScrambledWord();
+        } else if (practiceType === "multiple_choice") {
+          mcResultEl.classList.add("hidden");
+          mcNextBtn.classList.add("hidden");
+          updateMultipleChoiceOptions();
+        } else if (practiceType === "word_building") {
+          wbResultEl.classList.add("hidden");
+          wbNextBtn.classList.add("hidden");
+          wbInput.value = "";
+          wbInput.disabled = false;
+          wbCheckBtn.disabled = false;
+          initWordBuilding();
+        } else if (practiceType === "error_correction") {
+          errorCorrectionResultEl.classList.add("hidden");
+          errorCorrectionPlayBtn.classList.add("hidden");
+          errorCorrectionNextBtn.classList.add("hidden");
+          errorCorrectionInput.value = "";
+          errorCorrectionInput.disabled = false;
+          errorCorrectionCheckBtn.disabled = false;
+          updateIncorrectWord();
+        }
+
+        // Check if practice is complete
+        if (currentWordIndex >= words.length) {
+          showFinalResults();
+          return;
+        }
+      }
+
+      // Show final results
+      function showFinalResults() {
+        // Hide the current practice UI
+        if (practiceType === "spell") {
+          spellingPracticeEl.style.display = "none";
+        } else if (practiceType === "fill_blank") {
+          fillBlankPracticeEl.style.display = "none";
+        } else if (practiceType === "scramble") {
+          scramblePracticeEl.style.display = "none";
+        } else if (practiceType === "multiple_choice") {
+          multipleChoicePracticeEl.style.display = "none";
+        } else if (practiceType === "word_building") {
+          wordBuildingPracticeEl.style.display = "none";
+        } else if (practiceType === "error_correction") {
+          errorCorrectionPracticeEl.style.display = "none";
+        }
+
+        document.getElementById("progress").classList.add("hidden");
+        finalResultsEl.classList.remove("hidden");
+
+        scoreEl.textContent = correctCount;
+
+        // Show mistakes if any
+        if (mistakes.length > 0) {
+          mistakesContainerEl.classList.remove("hidden");
+          mistakesListEl.innerHTML = "";
+
+          // Remove duplicates from mistakes
+          const uniqueMistakes = [...new Set(mistakes)];
+
+          uniqueMistakes.forEach((word) => {
+            const li = document.createElement("li");
+            li.textContent = word;
+            mistakesListEl.appendChild(li);
+          });
+        } else {
+          mistakesContainerEl.classList.add("hidden");
+        }
+      }
+
+      // Event listeners
+      window.addEventListener("DOMContentLoaded", loadWords);
+
+      // Spelling practice listeners
+      if (playBtn) {
+        playBtn.addEventListener("click", playCurrentWord);
+      }
+      if (checkBtn) {
+        checkBtn.addEventListener("click", checkSpellingAnswer);
+      }
+      if (wordInput) {
+        wordInput.addEventListener("keypress", (event) => {
+          if (event.key === "Enter") {
+            checkSpellingAnswer();
+          }
+        });
+      }
+      if (spellNextBtn) {
+        spellNextBtn.addEventListener("click", nextWord);
+      }
+
+      // Fill in blanks listeners
+      if (blankCheckBtn) {
+        blankCheckBtn.addEventListener("click", checkBlankAnswer);
+      }
+      if (blankInput) {
+        blankInput.addEventListener("keypress", (event) => {
+          if (event.key === "Enter") {
+            checkBlankAnswer();
+          }
+        });
+      }
+      if (blankPlayBtn) {
+        blankPlayBtn.addEventListener("click", playCurrentWord);
+      }
+      if (blankNextBtn) {
+        blankNextBtn.addEventListener("click", nextWord);
+      }
+
+      // Word scramble listeners
+      if (scrambleCheckBtn) {
+        scrambleCheckBtn.addEventListener("click", checkScrambleAnswer);
+      }
+      if (scrambleInput) {
+        scrambleInput.addEventListener("keypress", (event) => {
+          if (event.key === "Enter") {
+            checkScrambleAnswer();
+          }
+        });
+      }
+      if (scramblePlayBtn) {
+        scramblePlayBtn.addEventListener("click", playCurrentWord);
+      }
+      if (scrambleNextBtn) {
+        scrambleNextBtn.addEventListener("click", nextWord);
+      }
+
+      // Multiple choice listeners
+      if (mcPlayBtn) {
+        mcPlayBtn.addEventListener("click", playCurrentWord);
+      }
+
+      if (mcNextBtn) {
+        mcNextBtn.addEventListener("click", nextWord);
+      }
+
+      // Word building listeners
+      if (wbPlayBtn) {
+        wbPlayBtn.addEventListener("click", playCurrentWord);
+      }
+      if (wbCheckBtn) {
+        wbCheckBtn.addEventListener("click", checkWordBuildingAnswer);
+      }
+      if (wbInput) {
+        wbInput.addEventListener("keypress", (event) => {
+          if (event.key === "Enter") {
+            checkWordBuildingAnswer();
+          }
+        });
+      }
+      if (wbNextBtn) {
+        wbNextBtn.addEventListener("click", nextWord);
+      }
+
+      // Error correction listeners
+      if (errorCorrectionCheckBtn) {
+        errorCorrectionCheckBtn.addEventListener(
+          "click",
+          checkErrorCorrectionAnswer
+        );
+      }
+      if (errorCorrectionInput) {
+        errorCorrectionInput.addEventListener("keypress", (event) => {
+          if (event.key === "Enter") {
+            checkErrorCorrectionAnswer();
+          }
+        });
+      }
+      if (errorCorrectionPlayBtn) {
+        errorCorrectionPlayBtn.addEventListener("click", playCurrentWord);
+      }
+      if (errorCorrectionNextBtn) {
+        errorCorrectionNextBtn.addEventListener("click", nextWord);
+      }
+
+      // Final buttons listeners
+      if (retryBtn) {
+        retryBtn.addEventListener("click", () => {
+          // Reset the practice and start over
+          currentWordIndex = 0;
+          correctCount = 0;
+          mistakes = [];
+
+          // Show the appropriate practice UI
+          finalResultsEl.classList.add("hidden");
+          document.getElementById("progress").classList.remove("hidden");
+
+          if (practiceType === "spell") {
+            spellingPracticeEl.style.display = "block";
+          } else if (practiceType === "fill_blank") {
+            fillBlankPracticeEl.style.display = "block";
+            updateBlankedWord();
+          } else if (practiceType === "scramble") {
+            scramblePracticeEl.style.display = "block";
+            updateScrambledWord();
+          } else if (practiceType === "multiple_choice") {
+            multipleChoicePracticeEl.style.display = "block";
+            updateMultipleChoiceOptions();
+          } else if (practiceType === "word_building") {
+            wordBuildingPracticeEl.style.display = "block";
+            initWordBuilding();
+          } else if (practiceType === "error_correction") {
+            errorCorrectionPracticeEl.style.display = "block";
+            updateIncorrectWord();
+          }
+
+          currentWordNumEl.textContent = currentWordIndex + 1;
+        });
+      }
+      if (homeBtn) {
+        homeBtn.addEventListener("click", () => {
+          window.location.href = "/";
+        });
+      }
+    </script>
+  </body>
+</html>
