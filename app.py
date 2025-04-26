@@ -580,4 +580,5 @@ def delete_word_list(list_name):
     return jsonify({'error': 'List not found'}), 404
 
 if __name__ == '__main__':
-    app.run()
+    port = int(os.environ.get("PORT", 4000)) # Get the port from environment or use 50
+    app.run(host="0.0.0.0", port=port)
